@@ -74,11 +74,17 @@ main{display:flex;flex-direction:column;gap:24px;padding-top:12px}
 .pics{display:grid;gap:2px;background:var(--fill)}
 .pics.n2,.pics.n3,.pics.n4{grid-template-columns:1fr 1fr}
 .pics.n3>:first-child{grid-column:span 2}
-.pic{position:relative;background:var(--fill);overflow:hidden}
-.pics:not(.n1) .pic{aspect-ratio:4/3}
-.pic img{display:block;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .2s}
-.pic img.on{opacity:1}
-.pics.n1 .pic img{max-height:440px}
+.pic{position:relative;background:var(--fill);overflow:hidden;max-height:min(75vh,640px)}
+.pics:not(.n1) .pic{aspect-ratio:1/1}
+.pics.n3>.pic:first-child{aspect-ratio:2/1}
+.pic img{display:block;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .2s}
+.pic img.on,.pg img.on{opacity:1}
+.pdfcard{display:flex;flex-direction:column;border-radius:11px;overflow:hidden;background:var(--fill)}
+.pdfcard .pp{padding:10px 10px 0}
+.pdfcard .pg{position:relative;width:100%;max-height:min(66vh,520px);overflow:hidden}
+.pdfcard .pg img{display:block;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .2s}
+.pdfcard .pg img.on{opacity:1}
+.pdfcard .ftile{border-radius:0}
 .pic .more{position:absolute;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.45);color:#fff;font-weight:600;font-size:17px}
 .pic .play{position:absolute;inset:0;display:grid;place-items:center;background:#111}
 .pic .play span{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center}
@@ -349,18 +355,28 @@ function filePath(name,type){
   const d=new Date(),ext=(EXT[type]||((name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,8))||'bin');
   return'files/'+d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+uid()+'.'+ext;
 }
-function uploadFile(p){
+async function putNew(path,b64,message){
+  for(let i=0;;i++){
+    const r=await gh('PUT',contents(path),{message,content:b64,branch:cfg.branch});
+    if(r.status===409&&i<3){await new Promise(z=>setTimeout(z,500));continue}
+    await must(r);return(await r.json()).content.sha;
+  }
+}
+async function uploadFile(p){
   const path=filePath(p.name,p.type);
-  return blobToB64(p.blob).then(b64=>enqueue(async()=>{
-    for(let i=0;;i++){
-      const r=await gh('PUT',contents(path),{message:'첨부: '+p.name,content:b64,branch:cfg.branch});
-      if(r.status===409&&i<3){await new Promise(z=>setTimeout(z,500));continue}
-      await must(r);const j=await r.json();
-      cachePut(path,p.blob,p.type);
-      const f={path,name:p.name,type:p.type,size:p.blob.size,sha:j.content.sha};if(p.w){f.w=p.w;f.h=p.h}
-      return f;
+  const b64=await blobToB64(p.blob);
+  const tb64=p.thumb?await blobToB64(p.thumb.blob).catch(()=>null):null;
+  return enqueue(async()=>{
+    const sha=await putNew(path,b64,'첨부: '+p.name);
+    cachePut(path,p.blob,p.type);
+    const f={path,name:p.name,type:p.type,size:p.blob.size,sha};if(p.w){f.w=p.w;f.h=p.h}
+    if(p.pages)f.pages=p.pages;
+    if(tb64){
+      const tp=path.replace(/\.[^./]+$/,'')+'.preview.jpg';
+      try{const ts=await putNew(tp,tb64,'미리보기: '+p.name);cachePut(tp,p.thumb.blob,'image/jpeg');f.thumb={path:tp,sha:ts,w:p.thumb.w,h:p.thumb.h}}catch(e){}
     }
-  }));
+    return f;
+  });
 }
 function deleteFile(f){
   return enqueue(async()=>{
@@ -373,7 +389,7 @@ function deleteFile(f){
       if(r.status===422){const g=await gh('GET',contents(f.path)+'?ref='+enc(cfg.branch));if(g.status===404)return;if(g.ok&&i<3){sha=(await g.json()).sha;continue}}
       await must(r);return;
     }
-  }).then(()=>cacheDel(f.path)).catch(()=>{});
+  }).then(()=>{cacheDel(f.path);cacheDel(f.path+'.preview.jpg');if(f.thumb)deleteFile({path:f.thumb.path,sha:f.thumb.sha,name:'미리보기'})}).catch(()=>{});
 }
 const CACHE='drawer-files-v1';
 const ckey=p=>new URL('__f/'+p,location.href).href;
@@ -393,13 +409,48 @@ function fileURL(f){
   const p=fileBlob(f).then(b=>{const u=URL.createObjectURL(b);urls.set(f.path,u);return u}).finally(()=>flights.delete(f.path));
   flights.set(f.path,p);return p;
 }
-function findFile(path){for(const n of display())for(const f of(n.files||[]))if(f.path===path)return f;if(st.ed)for(const f of st.ed.keep)if(f.path===path)return f;return null}
+function findFile(path){
+  const pick=f=>{if(f.path===path)return f;if(f.thumb&&f.thumb.path===path)return{path:f.thumb.path,type:'image/jpeg',name:'미리보기'};return null};
+  for(const n of display())for(const f of(n.files||[])){const r=pick(f);if(r)return r}
+  if(st.ed)for(const f of st.ed.keep){const r=pick(f);if(r)return r}
+  return null;
+}
+/* PDF first-page preview: made at upload time; older PDFs get one drawn on this device and cached */
+async function makePdfThumb(blob){
+  const lib=await loadPdfJs();
+  const pdf=await lib.getDocument({data:new Uint8Array(await blob.arrayBuffer())}).promise;
+  try{
+    const pg=await pdf.getPage(1),v1=pg.getViewport({scale:1}),v=pg.getViewport({scale:Math.min(3,1000/v1.width)});
+    const c=document.createElement('canvas');c.width=Math.floor(v.width);c.height=Math.floor(v.height);
+    const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);
+    await pg.render({canvasContext:ctx,viewport:v}).promise;
+    const out=await new Promise(r=>c.toBlob(r,'image/jpeg',.82));
+    if(!out)throw new Error('thumb');
+    return{blob:out,w:c.width,h:c.height,pages:pdf.numPages};
+  }finally{try{pdf.destroy()}catch(e){}}
+}
+const thumbFlights=new Map();
+function localThumbURL(f){
+  const key=f.path+'.preview.jpg';
+  if(urls.has(key))return Promise.resolve(urls.get(key));
+  if(thumbFlights.has(key))return thumbFlights.get(key);
+  const p=(async()=>{
+    let b=await cacheGet(key);
+    if(!b){b=(await makePdfThumb(await fileBlob(f))).blob;cachePut(key,b,'image/jpeg')}
+    const u=URL.createObjectURL(b);urls.set(key,u);return u;
+  })().finally(()=>thumbFlights.delete(key));
+  thumbFlights.set(key,p);return p;
+}
 const io='IntersectionObserver'in window?new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){io.unobserve(e.target);hydrate(e.target)}}),{rootMargin:'800px'}):null;
 function hydrate(el){
+  const show=u=>{el.onload=()=>el.classList.add('on');el.src=u;if(el.complete&&el.naturalWidth)el.classList.add('on')};
+  if(el.dataset.pdfthumb){const f=findFile(el.dataset.pdfthumb);if(f)localThumbURL(f).then(show).catch(()=>{});return}
   const f=findFile(el.dataset.path);if(!f)return;
-  fileURL(f).then(u=>{el.src=u;el.onload=()=>el.classList.add('on');if(el.complete)el.classList.add('on')}).catch(()=>{el.alt='불러오지 못함'});
+  fileURL(f).then(show).catch(()=>{el.alt='불러오지 못함'});
 }
-function hydrateAll(root){root.querySelectorAll('[data-path]').forEach(el=>{if(urls.has(el.dataset.path)){el.src=urls.get(el.dataset.path);el.classList.add('on')}else if(io)io.observe(el);else hydrate(el)})}
+function hydrateAll(root){root.querySelectorAll('[data-path],[data-pdfthumb]').forEach(el=>{
+  const key=el.dataset.path||(el.dataset.pdfthumb+'.preview.jpg');
+  if(urls.has(key)){el.src=urls.get(key);el.classList.add('on')}else if(io)io.observe(el);else hydrate(el)})}
 
 /* ---------- status ---------- */
 function setStatus(t,err){const s=$('#status');s.textContent=t;s.classList.toggle('err',!!err)}
@@ -415,13 +466,19 @@ function cardHTML(n){
   if(media.length){
     const shown=media.slice(0,4),k=shown.length;
     h+='<div class="pics n'+k+'">'+shown.map((m,i)=>{
-      let ar='';if(k===1){let r=(m.w&&m.h)?m.w/m.h:1.33;r=Math.max(.75,Math.min(2,r));ar=' style="aspect-ratio:'+r.toFixed(3)+'"'}
+      let ar='';if(k===1){const r=(m.w&&m.h)?m.w/m.h:1.33;ar=' style="aspect-ratio:'+r.toFixed(4)+'"'}
       const inner=isImg(m)?'<img alt="" data-path="'+esc(m.path)+'">':'<div class="play"><span>'+IC.play+'</span></div>';
       const more=(i===3&&media.length>4)?'<span class="more">+'+(media.length-4)+'</span>':'';
       return'<div class="pic"'+ar+'>'+inner+more+'</div>';
     }).join('')+'</div>';
   }
-  if(docs.length)h+='<div class="docs">'+docs.slice(0,3).map(d=>'<div class="ftile"><span class="ext'+(isPdf(d)?' pdf':'')+'">'+esc(extOf(d))+'</span><b>'+esc(d.name||'파일')+'</b><small>'+fmtSize(d.size)+'</small></div>').join('')+(docs.length>3?'<div class="ftile"><b>외 '+(docs.length-3)+'개</b></div>':'')+'</div>';
+  if(docs.length)h+='<div class="docs">'+docs.slice(0,3).map(d=>{
+    const row='<div class="ftile"><span class="ext'+(isPdf(d)?' pdf':'')+'">'+esc(extOf(d))+'</span><b>'+esc(d.name||'파일')+'</b><small>'+(d.pages?d.pages+'쪽 · ':'')+fmtSize(d.size)+'</small></div>';
+    if(!isPdf(d))return row;
+    const t=d.thumb,ar=t&&t.w?t.w+'/'+t.h:'1/1.414';
+    const img=t?'<img alt="" data-path="'+esc(t.path)+'">':'<img alt="" data-pdfthumb="'+esc(d.path)+'">';
+    return'<div class="pdfcard"><div class="pp"><div class="pg" style="aspect-ratio:'+ar+'">'+img+'</div></div>'+row+'</div>';
+  }).join('')+(docs.length>3?'<div class="ftile"><b>외 '+(docs.length-3)+'개</b></div>':'')+'</div>';
   const t=(n.text||'').replace(/^\s+|\s+$/g,'');
   if(t)h+='<p class="ctext">'+esc(t)+'</p>';
   h+='<div class="cm">'+(n.pinned?IC.pin:'')+'<span>'+rel(n.createdAt)+'</span></div></div>';
@@ -580,7 +637,7 @@ function openEditor(n,files){
 function closeEditor(){if(!st.ed)return;st.ed.pending.forEach(p=>p.url&&URL.revokeObjectURL(p.url));st.ed=null;$('#editor').hidden=true;edPaste.textContent='';lock(!!st.view)}
 function renderTray(){
   const T=$('#edTray'),e=st.ed;if(!e)return;
-  const items=e.keep.map(f=>({k:'o:'+f.path,path:isImg(f)?f.path:null,label:isVid(f)?'동영상':extOf(f),name:f.name,isNew:false}))
+  const items=e.keep.map(f=>({k:'o:'+f.path,path:isImg(f)?f.path:(f.thumb?f.thumb.path:null),label:isVid(f)?'동영상':extOf(f),name:f.name,isNew:false}))
     .concat(e.pending.map(p=>({k:'n:'+p.key,img:p.url||null,label:p.kind==='video'?'동영상':(p.name.split('.').pop()||'').toUpperCase(),name:p.name,isNew:true})));
   T.hidden=!items.length;
   T.innerHTML=items.map(i=>'<div class="att" title="'+esc(i.name||'')+'">'+(i.img?'<img alt="" src="'+i.img+'">':i.path?'<img alt="" data-path="'+esc(i.path)+'">':'<span><b>'+esc(i.label)+'</b><br>'+esc((i.name||'').slice(0,18))+'</span>')+(i.isNew?'<span class="new">NEW</span>':'')+'<button type="button" class="x" data-k="'+esc(i.k)+'" aria-label="첨부 빼기">×</button></div>').join('');
@@ -628,6 +685,11 @@ async function prepare(file){
     return{...base,name:base.name.replace(/\.[^.]+$/,'')+'.jpg',blob,type:'image/jpeg',kind:'image',w:cw,h:chh,url:URL.createObjectURL(blob)};
   }
   if(/^video\//.test(type))return cap({...base,blob:file,type,kind:'video'});
+  if(type==='application/pdf'){
+    const p=cap({...base,blob:file,type,kind:'file'});
+    try{const t=await makePdfThumb(file);p.thumb={blob:t.blob,w:t.w,h:t.h};p.pages=t.pages;p.url=URL.createObjectURL(t.blob)}catch(e){}
+    return p;
+  }
   return cap({...base,blob:file,type,kind:'file'});
 }
 async function addFiles(fs){
