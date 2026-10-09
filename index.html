@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <title>서랍</title>
 <meta name="description" content="나만 쓰는 메모 서랍">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -33,7 +33,8 @@
 }}
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+input,textarea,select{font-size:max(16px,1em)}
 button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:0;padding:0}
 a{color:var(--accent)}
@@ -74,7 +75,7 @@ main{display:flex;flex-direction:column;gap:24px;padding-top:12px}
 .pics{display:grid;gap:2px;background:var(--fill)}
 .pics.n2,.pics.n3,.pics.n4{grid-template-columns:1fr 1fr}
 .pics.n3>:first-child{grid-column:span 2}
-.pic{position:relative;background:var(--fill);overflow:hidden;max-height:min(75vh,640px)}
+.pic{position:relative;background:var(--fill);overflow:hidden;width:100%;max-height:min(75vh,640px)}
 .pics:not(.n1) .pic{aspect-ratio:1/1}
 .pics.n3>.pic:first-child{aspect-ratio:2/1}
 .pic img{display:block;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity .2s}
@@ -113,7 +114,7 @@ main{display:flex;flex-direction:column;gap:24px;padding-top:12px}
 .field{display:flex;flex-direction:column;gap:6px}
 .field label{font-size:13px;font-weight:600}
 .field input,.field textarea{width:100%;border:1px solid var(--hair);background:var(--card);border-radius:12px;padding:11px 12px;font-size:16px}
-.field textarea{min-height:76px;resize:vertical;font-family:var(--mono);font-size:13px}
+.field textarea{min-height:76px;resize:vertical;font-family:var(--mono);font-size:16px}
 .field small{font-size:12px;color:var(--sub)}
 .btnp{height:46px;border-radius:12px;background:var(--accent);color:#fff;font-weight:600;font-size:16px}
 .btnp:disabled{opacity:.5}
@@ -164,22 +165,29 @@ video{display:block;width:100%;border-radius:12px;background:#000;min-height:120
 .set code{font-family:var(--mono);font-size:13px;background:var(--fill);padding:1px 6px;border-radius:5px;overflow-wrap:anywhere}
 .set .warn{color:var(--danger)}
 
-/* editor */
-.ed{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;padding:12px 20px calc(16px + env(safe-area-inset-bottom,0px));gap:12px}
-.ed textarea{flex:1;min-height:180px;border:0;resize:none;background:transparent;font-size:17px;line-height:1.6;padding:0}
-.ed textarea:focus{outline:none}
-.tray{display:flex;gap:8px;flex-wrap:wrap}
+/* editor: compact popup that sits on top of the keyboard */
+#editor{align-items:flex-end;background:rgba(0,0,0,.18)}
+.esheet{width:100%;max-width:600px;background:var(--card);border-radius:20px 20px 0 0;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;box-shadow:0 -10px 40px -10px rgba(0,0,0,.3);transform:translateY(calc(-1 * var(--kb,0px)));transition:transform .18s ease}
+#editor.kbopen .esheet{padding-bottom:10px}
+@media (min-width:760px){#editor{align-items:center}.esheet{border-radius:18px;transform:none}}
+.ehead{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
+.ehead span{font-size:13px;font-weight:600;color:var(--sub)}
+.ehead button{width:30px;height:30px;border-radius:50%;background:var(--fill);color:var(--sub);display:grid;place-items:center}
+.ehead button svg{width:14px;height:14px}
+#edText{width:100%;border:0;resize:none;background:var(--fill);border-radius:14px;padding:10px 12px;font-size:17px;line-height:1.45;min-height:46px;max-height:38vh;overflow-y:auto;display:block}
+#edText:focus{outline:2px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+.erow{display:flex;align-items:center;gap:6px}
+.erow .sp{flex:1}
+.ebtn{height:36px;padding-inline:12px;border-radius:18px;background:var(--fill);color:var(--accent);font-weight:600;font-size:14px;display:flex;align-items:center;gap:5px}
+.ebtn svg{width:18px;height:18px}
+.esave{height:36px;padding-inline:18px;border-radius:18px;background:var(--accent);color:#fff;font-weight:600;font-size:15px}
+.esave:disabled{opacity:.45}
+.tray{display:flex;gap:8px;overflow-x:auto}
+.tray .att{flex:none}
 .att{position:relative;width:76px;height:76px;border-radius:12px;overflow:hidden;background:var(--fill);display:grid;place-items:center;text-align:center;font-size:11px;color:var(--sub);padding:6px;overflow-wrap:anywhere}
 .att img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .att .x{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;display:grid;place-items:center;font-size:14px;line-height:1}
 .att .new{position:absolute;left:4px;bottom:4px;font-size:9px;font-weight:700;color:#fff;background:var(--accent);border-radius:4px;padding:0 4px}
-.edtools{display:flex;gap:8px;flex-wrap:wrap}
-.addfile{flex:none;height:40px;padding-inline:14px;border-radius:20px;background:var(--fill);color:var(--accent);font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px}
-.addfile svg{width:18px;height:18px}
-.paste{flex:1;min-width:180px;min-height:40px;border:1.5px dashed color-mix(in srgb,var(--accent) 45%,transparent);border-radius:20px;padding:9px 14px;font-size:14px;color:var(--sub);outline:none;caret-color:transparent;-webkit-user-select:text;user-select:text;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.paste:empty::before{content:attr(data-ph)}
-.paste:focus{border-style:solid;border-color:var(--accent);color:var(--ink)}
-.paste:focus:empty::before{content:attr(data-ph-on)}
 
 .lightbox{position:fixed;inset:0;z-index:30;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
 .lightbox img{max-width:100%;max-height:calc(100% - 60px);object-fit:contain}
@@ -211,15 +219,15 @@ video{display:block;width:100%;border-radius:12px;background:#000;min-height:120
 <button class="fab" id="fab" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>새 메모</button>
 
 <div class="modal" id="viewer" hidden><div class="panel" role="dialog" aria-modal="true" aria-label="메모 보기" id="vpanel"></div></div>
-<div class="modal" id="editor" hidden><div class="panel" role="dialog" aria-modal="true" aria-label="메모 쓰기">
-  <div class="bar"><button class="tb" id="edCancel">취소</button><div class="ttl" id="edTitle">새 메모</div><button class="tb strong" id="edSave">저장</button></div>
-  <div class="ed">
-    <textarea id="edText" placeholder="메모" aria-label="메모 내용"></textarea>
-    <div class="tray" id="edTray" hidden></div>
-    <div class="edtools">
-      <button class="addfile" id="edAdd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg>사진·파일</button>
-      <div class="paste" id="edPaste" contenteditable="true" role="textbox" aria-label="사진 붙여넣기 칸" spellcheck="false" autocorrect="off" data-ph="복사한 사진 붙여넣기" data-ph-on="한 번 더 눌러 붙여넣기 선택"></div>
-    </div>
+<div class="modal" id="editor" hidden><div class="esheet" role="dialog" aria-modal="true" aria-label="메모 쓰기">
+  <div class="ehead"><span id="edTitle">새 메모</span><button type="button" id="edCancel" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="tray" id="edTray" hidden></div>
+  <textarea id="edText" rows="1" placeholder="메모" aria-label="메모 내용" enterkeyhint="enter"></textarea>
+  <div class="erow">
+    <button type="button" class="ebtn" id="edAdd" aria-label="사진·파일 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 8"/></svg>사진</button>
+    <button type="button" class="ebtn" id="edPasteBtn" aria-label="붙여넣기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3h6v1M9 10h6M9 14h4"/></svg>붙여넣기</button>
+    <span class="sp"></span>
+    <button type="button" class="esave" id="edSave">저장</button>
   </div>
 </div></div>
 <input type="file" id="file" multiple hidden>
@@ -626,15 +634,28 @@ document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(!$('#light
 document.addEventListener('paste',e=>{if(!cfg||st.ed)return;if(e.target.closest&&e.target.closest('input,textarea,[contenteditable]'))return;const fs=filesFrom(e.clipboardData);if(!fs.length)return;e.preventDefault();openEditor(null,fs)});
 
 /* ---------- editor ---------- */
-const edText=$('#edText'),edPaste=$('#edPaste');
+const edText=$('#edText');
+function grow(){edText.style.height='auto';edText.style.height=Math.min(edText.scrollHeight+2,Math.round(window.innerHeight*.38))+'px'}
+/* keep the popup sitting right on top of the on-screen keyboard */
+function placeSheet(){
+  const vv=window.visualViewport,ed=$('#editor');if(!vv||ed.hidden)return;
+  const kb=Math.max(0,Math.round(window.innerHeight-vv.height-vv.offsetTop));
+  ed.style.setProperty('--kb',kb+'px');ed.classList.toggle('kbopen',kb>80);
+  if(vv.offsetTop>0)window.scrollTo(0,0);
+}
+if(window.visualViewport){visualViewport.addEventListener('resize',placeSheet);visualViewport.addEventListener('scroll',placeSheet)}
 function openEditor(n,files){
   st.ed={id:n?n.id:null,orig:n?(n.files||[]).slice():[],keep:n?(n.files||[]).slice():[],pending:[]};
   $('#edTitle').textContent=n?'메모 편집':'새 메모';
   edText.value=n?(n.text||''):(LS.get('drawer-draft')||'');
-  $('#editor').hidden=false;lock(true);renderTray();
-  if(files&&files.length)addFiles(files);else setTimeout(()=>edText.focus(),30);
+  $('#editor').hidden=false;lock(true);renderTray();grow();placeSheet();
+  if(files&&files.length)addFiles(files);
+  else{edText.focus({preventScroll:true});const L=edText.value.length;try{edText.setSelectionRange(L,L)}catch(e){}}
 }
-function closeEditor(){if(!st.ed)return;st.ed.pending.forEach(p=>p.url&&URL.revokeObjectURL(p.url));st.ed=null;$('#editor').hidden=true;edPaste.textContent='';lock(!!st.view)}
+function closeEditor(){
+  if(!st.ed)return;st.ed.pending.forEach(p=>p.url&&URL.revokeObjectURL(p.url));st.ed=null;
+  edText.blur();$('#editor').hidden=true;$('#editor').style.setProperty('--kb','0px');lock(!!st.view);window.scrollTo(window.scrollX,window.scrollY);
+}
 function renderTray(){
   const T=$('#edTray'),e=st.ed;if(!e)return;
   const items=e.keep.map(f=>({k:'o:'+f.path,path:isImg(f)?f.path:(f.thumb?f.thumb.path:null),label:isVid(f)?'동영상':extOf(f),name:f.name,isNew:false}))
@@ -647,21 +668,28 @@ $('#edTray').addEventListener('click',e=>{const x=e.target.closest('.x');if(!x||
   if(k.startsWith('o:'))st.ed.keep=st.ed.keep.filter(f=>'o:'+f.path!==k);
   else{const i=st.ed.pending.findIndex(p=>'n:'+p.key===k);if(i>-1){const p=st.ed.pending[i];if(p.url)URL.revokeObjectURL(p.url);st.ed.pending.splice(i,1)}}
   renderTray()});
-edText.addEventListener('input',()=>{if(st.ed&&!st.ed.id)LS.set('drawer-draft',edText.value||null)});
+edText.addEventListener('input',()=>{grow();if(st.ed&&!st.ed.id)LS.set('drawer-draft',edText.value||null)});
 edText.addEventListener('paste',e=>{const fs=filesFrom(e.clipboardData);if(fs.length){e.preventDefault();e.stopPropagation();addFiles(fs)}});
 edText.addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();save()}});
-edPaste.addEventListener('paste',e=>{
-  e.preventDefault();e.stopPropagation();
-  const fs=filesFrom(e.clipboardData);
-  if(fs.length)addFiles(fs);
-  else{const t=e.clipboardData&&e.clipboardData.getData('text/plain');
-    if(t){const s=edText.selectionStart??edText.value.length;edText.value=edText.value.slice(0,s)+t+edText.value.slice(edText.selectionEnd??s);edText.dispatchEvent(new Event('input'))}
-    else toast('붙여넣을 사진을 찾지 못했어요')}
-  edPaste.textContent='';edPaste.blur();
+function insertText(t){const s=edText.selectionStart??edText.value.length,e2=edText.selectionEnd??s;edText.value=edText.value.slice(0,s)+t+edText.value.slice(e2);const c=s+t.length;try{edText.setSelectionRange(c,c)}catch(e){}edText.dispatchEvent(new Event('input'))}
+/* paste button: reads photos or text straight from the clipboard (iOS shows a small "붙여넣기" bubble to confirm) */
+$('#edPasteBtn').addEventListener('click',async()=>{
+  const cb=navigator.clipboard;
+  if(cb&&cb.read){
+    try{
+      const items=await cb.read();const files=[];let text='';
+      for(const it of items){
+        const it2=it.types.find(t=>/^image\//.test(t));
+        if(it2){const b=await it.getType(it2);files.push(new File([b],'붙여넣은 사진.'+((it2.split('/')[1]||'png').replace('jpeg','jpg')),{type:it2}))}
+        else if(it.types.includes('text/plain'))text+=await(await it.getType('text/plain')).text();
+      }
+      if(files.length)addFiles(files);else if(text)insertText(text);else toast('복사해 둔 사진이나 글이 없어요');
+      return;
+    }catch(e){if(e&&e.name==='NotAllowedError'){toast('붙여넣기가 취소됐어요');return}}
+  }
+  if(cb&&cb.readText){try{const t=await cb.readText();if(t)insertText(t);else toast('복사해 둔 글이 없어요');return}catch(e){}}
+  toast('이 브라우저에서는 붙여넣기 버튼을 쓸 수 없어요. 입력칸을 길게 눌러 붙여넣어 주세요.');
 });
-edPaste.addEventListener('beforeinput',e=>{if(e.inputType!=='insertFromPaste')e.preventDefault()});
-edPaste.addEventListener('input',()=>{edPaste.textContent=''});
-edPaste.addEventListener('drop',e=>e.preventDefault());
 $('#edAdd').addEventListener('click',()=>$('#file').click());
 $('#file').addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';if(st.ed)addFiles(fs);else openEditor(null,fs)});
 $('#edCancel').addEventListener('click',closeEditor);
