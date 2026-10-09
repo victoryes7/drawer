@@ -1,5 +1,5 @@
 // 서랍 서비스 워커: 앱 화면은 최신 버전을 먼저 받고, 오프라인이면 저장해 둔 화면을 쓴다.
-const SHELL = 'drawer-shell-v1';
+const SHELL = 'drawer-shell-v2';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
